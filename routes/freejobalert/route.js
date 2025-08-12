@@ -21,6 +21,7 @@ router.get("/gov/other-all-india-exam", otherAllIndiaExam, (req, res) => {
 });
 
 router.get("/gov/state/:code([a-zA-Z]{2})", stateWiseGovjobs, (req, res) => {
+  
   res.send(res.results);
 });
 
@@ -203,6 +204,7 @@ async function allIndiaTeachingJobs(req, res, next) {
 
 //////////////////////////////////////////////////////////////////////////////////////
 async function getDefault(req, res, next) {
+  
   log = log.scope("freejobalert:getDefault");
   let results;
   await latestNotifications("http://www.freejobalert.com/")

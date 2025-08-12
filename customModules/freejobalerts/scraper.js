@@ -6,6 +6,7 @@ const signale = require('signale');
 
 
 function topicScraper(URL, topic,tableNO) {
+    console.log("url this is fetch ",URL);
     var log = signale.scope("scraper:TopicScraper");
     const options = {
         url: URL,
@@ -26,36 +27,49 @@ function topicScraper(URL, topic,tableNO) {
                 
                 log.success("successfully fetched");
                 const $ = cheerio.load(html);
-                var allPosts = $('div .post');
+                var allPosts = $('div.entry-content');
+                log.log("this is all post ",allPosts);
                 var topic = $(allPosts).find('table').eq(tableNO);
                 // log.log(topic.html());
                 var entries = $(topic).find('tr').toArray();
                // log.log(entries.length);
 
-                entries.forEach((el,index)=>{
-                    if(index===0) return; //to skip the first row which contains empty data
-                    var result ={
-                        postDate:"",
-                        postBoard:"",
-                        postName:"",
-                        qualification:"",
-                        advtNo:"",
-                        lastDate:"",
-                        link:""
-                    }
-                    result.postDate = $(el).find('td').eq(0).text();
-                    result.postBoard=$(el).find('td').eq(1).text();
-                    result.postName=$(el).find('td').eq(2).text();
-                    result.qualification = $(el).find('td').eq(3).text();
-                    result.advtNo = $(el).find('td').eq(4).text();
-                    result.lastDate = $(el).find('td').eq(5).text();
-                    result.link = $(el).find('td').eq(6).find('a').attr('href');
 
-                    results.push(result);
-                 
+                let jobs = [];
+
+              
+
+                // Find all tables inside the main content
+                $('div.entry-content table').each((tableIndex, tableElem) => {
+                    if (tableIndex === 0) return; // skip first table
+
+                    // Loop through each row (skip header row)
+                    $(tableElem).find("tr").slice(1).each((_, row) => {
+                    const cells = $(row).find("td").map((i, cell) => {
+                        return $(cell).text().trim();
+                    }).get();
+
+                    const detailsLink = $(row).find("td:last-child a").attr("href") || "";
+
+                    jobs.push({
+                        postDate: cells[0] || "",
+                        postBoard: cells[1] || "",
+                        postName: cells[2] || "",
+                        qualification: cells[3] || "",
+                        advtNo: cells[4] || "",
+                        lastDate: cells[5] || "",
+                        link: detailsLink
+                    });
+                    });
                 });
-                //log.log(results);
-                resolve(results);
+
+                if (jobs.length > 0) {
+                  jobs.pop();
+                }
+
+                resolve(jobs);
+
+    
             }
         })
     })
@@ -81,7 +95,10 @@ return new Promise((resolve, reject) => {
         else if (!error && response.statusCode === 200) {
             log.success("successfully fetched");
             const $ = cheerio.load(html);
-            const notifications = $('div .listcontentj').find('ul').toArray();
+            // log.log("data",$);
+            const notifications = $('div.gb-inside-container').find('ul').toArray();
+            log.log("notifications ",notifications)
+
             notifications.forEach((el, index) => {
                 var result = {
                     title: "",
@@ -93,7 +110,7 @@ return new Promise((resolve, reject) => {
                 // add it to the list
                 results.push(result);
             });
-            //log.log(results);
+            log.log("fetched ",results);
             resolve(results);
         }
 
@@ -116,7 +133,7 @@ return new Promise((resolve, reject) => {
 function smartScraper(URL,topic) {
     var log = signale.scope("scraper:stateWiseScraper");
 
- 
+    
 
     const options = {
         url: URL,
@@ -136,54 +153,45 @@ function smartScraper(URL,topic) {
             else if (!error && response.statusCode === 200) {
                 log.success("successfully fetched");
                 const $ = cheerio.load(html);
-                const posts = $('div .post');
-                const tables = posts.find('table').toArray();
-              //  signale.log(tables.length);
-               
-                var desiredTble;
 
-                const matchPattern = new RegExp('<th>Recruitment Board</th>');
+                const posts = $("div.post, div .post"); // flexible selector
+    const tables = posts.find("table").toArray();
 
-                tables.forEach((el,index)=>{
-                    //signale.log($(el).html());
+    let dataTable = null;
 
+    // Find the table that has "Recruitment Board" in its header
+    for (let table of tables) {
+        const headerText = $(table).find("th").map((i, el) => $(el).text().trim()).get().join(" ");
+        if (headerText.includes("Recruitment Board")) {
+            dataTable = table;
+            break;
+        }
+    }
 
-                    // points the actual table avoiding other unnecessary stuffs
-                    var textToMatch =$(el).html().replace(/^\s+|\s+$/g, '');
-                    if(matchPattern.test(textToMatch)) {
-                        desiredTble=index;
-                       // log.star("matched");
-                        return;
-                    }
-                });
+    if (!dataTable) {
+        return []; // no matching table found
+    }
 
-                var dataTable = tables[desiredTble];
-               // signale.log($(dataTable).text());
-                var entries = $(dataTable).find('tr').toArray();
-                 entries.forEach((el,index)=>{
-                     if(index===0) return; //to skip the first row which contains empty data
-                     var result ={
-                         postDate:"",
-                         postBoard:"",
-                         postName:"",
-                         qualification:"",
-                         advtNo:"",
-                         lastDate:"",
-                         link:""
-                     }
-                     result.postDate = $(el).find('td').eq(0).text();
-                     result.postBoard=$(el).find('td').eq(1).text();
-                     result.postName=$(el).find('td').eq(2).text();
-                     result.qualification = $(el).find('td').eq(3).text();
-                     result.advtNo = $(el).find('td').eq(4).text();
-                     result.lastDate = $(el).find('td').eq(5).text();
-                     result.link = $(el).find('td').eq(6).find('a').attr('href');
- 
-                     results.push(result);
-                  
-                 });
-                 //signale.star(results);
-                resolve(results);
+    const results = [];
+
+    $(dataTable).find("tr").each((i, row) => {
+        if (i === 0) return; // skip header
+
+        const cells = $(row).find("td");
+        if (cells.length < 7) return; // skip malformed rows
+
+        results.push({
+            postDate: $(cells[0]).text().trim(),
+            postBoard: $(cells[1]).text().trim(),
+            postName: $(cells[2]).text().trim(),
+            qualification: $(cells[3]).text().trim(),
+            advtNo: $(cells[4]).text().trim(),
+            lastDate: $(cells[5]).text().trim(),
+            link: $(cells[6]).find("a").attr("href") || ""
+        });
+    });
+    
+        resolve(results);
             }
     
         });
