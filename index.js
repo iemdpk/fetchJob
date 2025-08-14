@@ -2,11 +2,13 @@ const express = require('express');
 const signale = require('signale');
 const dotenv = require('dotenv');
 const freejobalert = require('./routes/freejobalert/route');
-
+const cors = require('cors');
 const app = express();
 dotenv.config();
 
+
 var log = signale.scope("server:global");
+app.use(cors())
 app.use(express.json());
 
 app.get('/',(req,res)=>{
